@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:nrs2023/screens/emailVaildation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
@@ -12,12 +14,31 @@ class Register extends StatefulWidget {
   State<Register> createState() => _RegisterState();
 }
 
+class _AccountNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    String value = newValue.text.replaceAll('-', '');
+    String formattedValue = '';
+    for (int i = 0; i < value.length; i++) {
+      formattedValue += value[i];
+      if ((i + 1) % 4 == 0 && i != value.length - 1) {
+        formattedValue += '-';
+      }
+    }
+    return TextEditingValue(
+      text: formattedValue,
+      selection: TextSelection.collapsed(offset: formattedValue.length),
+    );
+  }
+}
+
 class _RegisterState extends State<Register> {
-  final List _focusInput = List.generate(7, (index) => FocusNode());
+  final List _focusInput = List.generate(9, (index) => FocusNode());
   final _formkey = GlobalKey<FormState>();
 
   final List _controllers =
-      List.generate(8, (index) => TextEditingController());
+      List.generate(9, (index) => TextEditingController());
   final myController = TextEditingController();
 
   void registerNewUser(
@@ -27,9 +48,10 @@ class _RegisterState extends State<Register> {
       String username,
       String password,
       String address,
-      String phoneNumber) async {
+      String phoneNumber,
+      String accountNumber) async {
     final res = await http.post(
-        Uri.parse("http://siprojekat.duckdns.org:5051/api/Register"),
+        Uri.parse("http://siprojekat.duckdns.org:5051/api/User"),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
@@ -40,7 +62,8 @@ class _RegisterState extends State<Register> {
           "username": username,
           "password": password,
           "address": address,
-          "phoneNumber": phoneNumber
+          "phoneNumber": phoneNumber,
+          "accountNumber": accountNumber
         }));
     if (res.statusCode == 200 && context.mounted) {
       Navigator.push(
@@ -52,6 +75,7 @@ class _RegisterState extends State<Register> {
                 )),
       );
     } else {
+      //print(res.body.toString());
       showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -93,6 +117,8 @@ class _RegisterState extends State<Register> {
     super.dispose();
   }
 
+
+
   InputDecoration registerInputDecoration(String labelText, String hintText) {
     return InputDecoration(
       isDense: true,
@@ -106,13 +132,32 @@ class _RegisterState extends State<Register> {
     );
   }
 
+  void triggerNotification() {
+    AwesomeNotifications().isNotificationAllowed().then((isAllowed) {
+      if(!isAllowed) {
+        AwesomeNotifications().requestPermissionToSendNotifications();
+      }
+    });
+    AwesomeNotifications().createNotification(
+        content: NotificationContent(
+            id: 1,
+            channelKey: 'channelKey',
+            title: "Notification Title",
+            body: "Notification Content"
+        )
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(
-          title: const Text("Register"),
+          title: GestureDetector(
+            onLongPress: triggerNotification,
+            child: const Text("Register"),
+          ),
           centerTitle: true,
           leading: BackButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -124,7 +169,7 @@ class _RegisterState extends State<Register> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 30),
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Form(
                   key: _formkey,
                   child: Column(
@@ -151,7 +196,7 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -178,7 +223,7 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -206,7 +251,7 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -231,7 +276,7 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -250,15 +295,28 @@ class _RegisterState extends State<Register> {
                           validator: (value) {
                             if (value == null ||
                                 value.isEmpty ||
-                                value.length < 10) {
+                                value.length <= 10) {
                               return 'Password must be longer than 10 characters';
                             }
+                            else if (!value.contains(
+                                RegExp('[1-9]',))) {
+                              return 'Password must contain at least one digit';
+                            }
+                            else if (!value.contains(
+                                RegExp('[A-Z]',))) {
+                              return 'Password must contain at least one capital letter';
+                            }
+                            else if (!value.contains(
+                                RegExp('[^a-zA-Z0-9]',))) {
+                              return 'Password must contain a non-alphanumeric character';
+                            }
+
                             return null;
                           },
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -284,7 +342,7 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
-                        height: 20,
+                        height: 10,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -308,13 +366,35 @@ class _RegisterState extends State<Register> {
                         ),
                       ),
                       const SizedBox(
+                        height: 10,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: TextFormField(
+                          focusNode: _focusInput[6],
+                          controller: _controllers[6],
+                          keyboardType: TextInputType.visiblePassword,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
+                              _AccountNumberFormatter(),
+                              LengthLimitingTextInputFormatter(19),
+                            ],
+                          decoration: registerInputDecoration(
+                              "Account Number", "Enter Your account information"),
+                          onChanged: (String value) {},
+                          onFieldSubmitted: (String value) {
+                            FocusScope.of(context).requestFocus(_focusInput[7]);
+                          },
+                        ),
+                      ),
+                      const SizedBox(
                         height: 20,
                       ),
                       Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: InternationalPhoneNumberInput(
-                            focusNode: _focusInput[6],
-                            textFieldController: _controllers[6],
+                            focusNode: _focusInput[7],
+                            textFieldController: _controllers[7],
                             countrySelectorScrollControlled: true,
                             onInputChanged: (PhoneNumber value) {},
                             autoValidateMode:
@@ -326,8 +406,9 @@ class _RegisterState extends State<Register> {
                               return null;
                             },
                           )),
+
                       const SizedBox(
-                        height: 40,
+                        height: 30,
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 100),
@@ -344,6 +425,16 @@ class _RegisterState extends State<Register> {
                                 )),
                             onPressed: () {
                               if (_formkey.currentState!.validate()) {
+                               /* print(
+                                    _controllers[1].text+" "+
+                                    _controllers[2].text+" "+
+                                    _controllers[0].text+" "+
+                                    _controllers[3].text+" "+ //username
+                                    _controllers[4].text+" "+
+                                    _controllers[5].text+" "+
+                                    "0${_controllers[7].text} "+
+                                    _controllers[6].text
+                                );*/
                                 registerNewUser(
                                     _controllers[1].text,
                                     _controllers[2].text,
@@ -351,18 +442,18 @@ class _RegisterState extends State<Register> {
                                     _controllers[3].text, //username
                                     _controllers[4].text,
                                     _controllers[5].text,
-                                    "0${_controllers[6].text}");
-
+                                    "0${_controllers[7].text}",
+                                    _controllers[6].text
+                                );
                               }
                             }),
                       ),
                       const SizedBox(
-                        height: 10,
+                        height: 20,
                       ),
                       Padding(padding: const EdgeInsets.symmetric(horizontal: 50),
                         child: Column(
                           children: [
-
                             SignInButton(
                               Buttons.Google,
                               text: "Register with Google",

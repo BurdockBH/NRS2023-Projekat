@@ -3,6 +3,7 @@ import 'package:nrs2023/screens/loginAuth.dart';
 import 'package:nrs2023/screens/numberValidation.dart';
 import 'package:nrs2023/screens/home.dart';
 import 'package:nrs2023/screens/welcome.dart';
+import 'package:nrs2023/screens/biometricAuth.dart';
 
 void main() {
   runApp(MyApp());
