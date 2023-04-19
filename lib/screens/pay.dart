@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:nrs2023/screens/templates.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:share/share.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage(
@@ -12,16 +13,61 @@ class PaymentPage extends StatefulWidget {
       required String recipientName,
       required String recipientAccount,
       required String amount,
-      required String currency,
-      this.transactionCategory})
+      required String currency})
       : super(key: key);
   final List templateData;
-  final String? transactionCategory;
 
   get recipientAccount => null;
 
   @override
   _PaymentPageState createState() => _PaymentPageState();
+}
+
+class Transaction {
+  double? amount;
+  String currency;
+  String paymentType;
+  String description;
+  String recipientAccountNumber;
+  String recipientFirstName;
+  String recipientLastName;
+
+  Transaction({
+    required this.amount,
+    required this.currency,
+    required this.paymentType,
+    required this.description,
+    required this.recipientAccountNumber,
+    required this.recipientFirstName,
+    required this.recipientLastName,
+  });
+
+  // Convert a transaction to a JSON string
+  String toJson() {
+    return json.encode({
+      'amount': amount,
+      'currency': currency,
+      'paymentType': paymentType,
+      'description': description,
+      'recipientAccountNumber': recipientAccountNumber,
+      'recipientFirstName': recipientFirstName,
+      'recipientLastName': recipientLastName,
+    });
+  }
+
+  // Create a transaction from a JSON string
+  static Transaction fromJson(String jsonString) {
+    Map<String, dynamic> jsonMap = json.decode(jsonString);
+    return Transaction(
+      amount: jsonMap['amount'],
+      currency: jsonMap['currency'],
+      paymentType: jsonMap['paymentType'],
+      description: jsonMap['description'],
+      recipientAccountNumber: jsonMap['recipientAccountNumber'],
+      recipientFirstName: jsonMap['recipientFirstName'],
+      recipientLastName: jsonMap['recipientLastName'],
+    );
+  }
 }
 
 class transactionValidation {
@@ -61,8 +107,8 @@ class _PaymentPageState extends State<PaymentPage> {
       TextEditingController();
   final TextEditingController _recipientDescriptionController =
       TextEditingController();
-  final storage = new FlutterSecureStorage();
   String _selectedCurrency = "USD";
+  final storage = new FlutterSecureStorage();
   final List<String> _currencies = [
     'USD',
     'AUD',
@@ -88,8 +134,14 @@ class _PaymentPageState extends State<PaymentPage> {
     'THB',
     'TWD'
   ];
-  String? selectedCategory = "Currency";
-  final List<String> category = ['Currency','Amount','Recipient Account', 'Transaction Details'];
+
+  String _selectedCategory = "Currency";
+  final List<String> _categories = [
+    'Currency',
+    'Amount',
+    'Recipient Account',
+    'Transaction Details'
+  ];
 
   Future<transactionValidation> validateTransaction(
       double? amount,
@@ -225,7 +277,7 @@ class _PaymentPageState extends State<PaymentPage> {
             leading: BackButton(
               onPressed: () => Navigator.of(context).pop(),
             )),
-        body: Padding(
+        body: SingleChildScrollView(
           padding: EdgeInsets.all(16),
           child: Form(
             key: _formKey,
@@ -341,17 +393,17 @@ class _PaymentPageState extends State<PaymentPage> {
                 SizedBox(height: 16),
                 Text('Transaction Category'),
                 DropdownButtonFormField<String>(
-                  value: selectedCategory,
+                  value: _selectedCategory,
                   onChanged: (String? value) {
                     setState(() {
-                      selectedCategory = value!;
+                      _selectedCategory = value!;
                     });
                   },
-                  items: category
-                      .map((cat) => DropdownMenuItem(
-                    value: cat,
-                    child: Text(cat),
-                  ))
+                  items: _categories
+                      .map((category) => DropdownMenuItem(
+                            value: category,
+                            child: Text(category),
+                          ))
                       .toList(),
                 ),
                 SizedBox(height: 16),
@@ -375,7 +427,40 @@ class _PaymentPageState extends State<PaymentPage> {
                         );
                       },
                       child: Text("Templates"),
-                    )
+                    ),
+                    SizedBox(
+                      width: 50,
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (_formKey.currentState!.validate()) {
+                          Transaction newTransaction = Transaction(
+                            amount: double.tryParse(_amountController.text),
+                            currency: _selectedCurrency,
+                            paymentType: "type",
+                            description: _recipientDescriptionController.text,
+                            recipientAccountNumber:
+                                _recipientAccountController.text,
+                            recipientFirstName:
+                                _recipientFirstNameController.text,
+                            recipientLastName:
+                                _recipientLastNameController.text,
+                          );
+
+                          String transactionJson = newTransaction.toJson();
+
+                          Share.share(transactionJson,
+                              subject: 'New transaction for execution');
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Transaction sent for execution')),
+                          );
+                        }
+                      },
+                      child: Text('Send'),
+                    ),
                   ],
                 ),
               ],
