@@ -1,6 +1,9 @@
+import 'dart:core';
+
 import 'package:flutter/material.dart';
 import 'package:nrs2023/screens/pay.dart';
 import 'package:intl/intl.dart';
+import 'package:nrs2023/screens/claim.dart';
 
 class TransactionDetailsScreen extends StatelessWidget {
   final String transactionId;
@@ -144,6 +147,22 @@ class TransactionDetailsScreen extends StatelessWidget {
                     ));
               },
               child: Text('Use as Template'),
+            ),
+          ),
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                primary: Color.fromARGB(255, 180, 0, 0), // Background color
+              ),
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => ClaimPage(
+                              transactionId: int.parse(transactionId),
+                            )));
+              },
+              child: Text('Claim'),
             ),
           ),
         ],

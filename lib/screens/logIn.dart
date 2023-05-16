@@ -6,30 +6,69 @@ import 'package:nrs2023/screens/logInPhone.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
 import 'package:http/http.dart' as http;
+import 'package:nrs2023/screens/welcome.dart';
 import 'package:provider/provider.dart';
+import '../api/google_sign_in.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
-
 import 'package:local_auth/local_auth.dart';
-
 import '../auth_provider.dart';
 import 'home.dart';
 import 'loginAuth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+
 
 class logIn extends StatefulWidget {
   const logIn({Key? key}) : super(key: key);
 
   @override
   State<logIn> createState() => _logInState();
+
+
+  Future<void> logout(BuildContext context) async {
+    final storage = FlutterSecureStorage();
+    //final token = await storage.read(key: 'token');
+    String? token = await storage.read(key: 'token');
+    final url = Uri.parse("http://siprojekat.duckdns.org:5051/api/User/logout");
+
+    try {
+      final response = await http.patch(
+          url,
+
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Authorization': 'Bearer $token'
+          });
+
+      // headers: {'Authorization': 'Bearer $token'},
+      // );
+      if (response.statusCode == 200) {
+        await storage.delete(key: 'token');
+        Navigator.pushAndRemoveUntil<Widget>(
+          context,
+          MaterialPageRoute<Widget>(builder: (context) => WelcomeScreen()),
+              (route) => false,
+        );
+      } else {
+        throw Exception('Failed to log out');
+      }
+    } catch (e) {
+      print('Error occurred while logging out: $e');
+    }
+  }
+
 }
+bool _isLoggedIn = false;
+Map _userObj = {};
 
 class _logInState extends State<logIn> {
+
   final _formkey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   late AuthProvider _authProvider;
 
   //Za dobivanje tokena na ostalim ekranima nakon uspješne prijave iskoristi ove dvije linije koda u initState svog ekrana:
-  //  final _authProvider = Provider.of<AuthProvider>(context, listen: false);
+   // final _authProvider = Provider.of<AuthProvider>(context, listen: false);
   //  token = _authProvider.token;
   var token;
   var userId;
@@ -58,6 +97,22 @@ class _logInState extends State<logIn> {
       OSNotificationDisplayType.notification;
     });
   }
+  
+  void sendNotification() async {
+
+    await http.post(
+        Uri.parse("https://onesignal.com/api/v1/notifications"),
+        headers: <String, String>{
+          'Authorization': 'Basic OGJhZmVkMTMtMDc0Ni00ZjdlLTg3MDctMTFiMGU4NTExMTRh',
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode({
+          "app_id": "fea9b7bf-2d17-401e-8026-78e184289a62",
+          "included_segments": ["Subscribed Users"],
+          "data": {"foo": "bar"},
+          "contents": {"en": "Sample Notification"}
+        }));
+  }
 
   void logInRequest(String phoneEmail, String password) async {
     final res = await http.post(
@@ -80,6 +135,7 @@ class _logInState extends State<logIn> {
       userId = responseData['userId'];
       final storage = new FlutterSecureStorage();
       await storage.write(key: 'token', value: '$token');
+
       showDialog(
         context: context,
         builder: (BuildContext context) {
@@ -175,7 +231,7 @@ class _logInState extends State<logIn> {
 
   void bioLogInRequest() async {
     getBioStorage();
-    print(bioMail + bioPassword);
+    //print(bioMail + bioPassword);
     final res = await http.post(
         Uri.parse("http://siprojekat.duckdns.org:5051/api/User/login"),
         headers: <String, String>{
@@ -305,7 +361,10 @@ class _logInState extends State<logIn> {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(
-          title: const Text("Login"),
+          title: GestureDetector(
+            onLongPress: sendNotification,
+            child: Text("Login"),
+          ),
           centerTitle: true,
           leading: BackButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -464,11 +523,43 @@ class _logInState extends State<logIn> {
                     SignInButton(
                       Buttons.Google,
                       //mini: true,
-                      onPressed: () {},
+                      onPressed: () async {
+                        await GoogleSignInApi.signOut;
+                        await GoogleSignInApi.login();
+                        //_handleSignIn;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => HomeScreen()),
+                        );
+                      },
                     ),
                     SignInButton(
                       Buttons.Facebook,
-                      onPressed: () {},
+                      onPressed: () async {
+                        /* await _handleSignOut();
+                                await _handleSignIn;*/
+                        await FacebookAuth.instance.logOut().then((value) {
+                          setState(() {
+                            _isLoggedIn = false;
+                            _userObj = {};
+                          });
+                        });
+                        await FacebookAuth.instance.login(
+                            permissions: ["public_profile", "email"]).then((value) {
+                          FacebookAuth.instance.getUserData().then((userData) async {
+                            setState(() {
+                              _isLoggedIn = true;
+                              _userObj = userData;
+                            });
+                          });
+                        });
+                        //if(_isLoggedIn){
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => HomeScreen()),
+                          );
+                        //}
+                      },
                     )
                   ],
                 ),

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:nrs2023/screens/templates.dart';
+import 'package:nrs2023/screens/transactionExchange.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:nrs2023/screens/voucherScreenQRScan.dart';
 import 'package:share/share.dart';
 
 class PaymentPage extends StatefulWidget {
@@ -13,9 +15,10 @@ class PaymentPage extends StatefulWidget {
       required String recipientName,
       required String recipientAccount,
       required String amount,
-      required String currency})
+      required this.currency})
       : super(key: key);
   final List templateData;
+  final String currency;
 
   get recipientAccount => null;
 
@@ -26,46 +29,50 @@ class PaymentPage extends StatefulWidget {
 class Transaction {
   double? amount;
   String currency;
-  String paymentType;
-  String description;
+  String transactionType;
+  String transactionPurpose;
+  String category;
+  String senderAccountNumber;
+  String recipientName;
   String recipientAccountNumber;
-  String recipientFirstName;
-  String recipientLastName;
 
   Transaction({
     required this.amount,
     required this.currency,
-    required this.paymentType,
-    required this.description,
+    required this.transactionType,
+    required this.transactionPurpose,
+    required this.category,
+    required this.senderAccountNumber,
+    required this.recipientName,
     required this.recipientAccountNumber,
-    required this.recipientFirstName,
-    required this.recipientLastName,
   });
 
-  // Convert a transaction to a JSON string
+  // Convertovanje tranzakcije u JSON string
   String toJson() {
     return json.encode({
       'amount': amount,
       'currency': currency,
-      'paymentType': paymentType,
-      'description': description,
+      'transactionType': transactionType,
+      'transactionPurpose': transactionPurpose,
+      'category': category,
+      'senderAccountNumber': senderAccountNumber,
+      'recipientName': recipientName,
       'recipientAccountNumber': recipientAccountNumber,
-      'recipientFirstName': recipientFirstName,
-      'recipientLastName': recipientLastName,
     });
   }
 
-  // Create a transaction from a JSON string
+  // Pravljenje tranzakcije preko JSON string
   static Transaction fromJson(String jsonString) {
     Map<String, dynamic> jsonMap = json.decode(jsonString);
     return Transaction(
       amount: jsonMap['amount'],
       currency: jsonMap['currency'],
-      paymentType: jsonMap['paymentType'],
-      description: jsonMap['description'],
+      transactionType: jsonMap['transactionType'],
+      transactionPurpose: jsonMap['transactionPurpose'],
+      category: jsonMap['category'],
+      senderAccountNumber: jsonMap['senderAccountNumber'],
+      recipientName: jsonMap['recipientName'],
       recipientAccountNumber: jsonMap['recipientAccountNumber'],
-      recipientFirstName: jsonMap['recipientFirstName'],
-      recipientLastName: jsonMap['recipientLastName'],
     );
   }
 }
@@ -99,15 +106,16 @@ class _AccountNumberFormatter extends TextInputFormatter {
 class _PaymentPageState extends State<PaymentPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _recipientFirstNameController =
+  final TextEditingController _recipientNameController =
       TextEditingController();
   final TextEditingController _recipientAccountController =
       TextEditingController();
-  final TextEditingController _recipientLastNameController =
-      TextEditingController();
+
+  // final TextEditingController _recipientLastNameController =
+  //    TextEditingController();
   final TextEditingController _recipientDescriptionController =
       TextEditingController();
-  String _selectedCurrency = "USD";
+  String _selectedCurrency = "";
   final storage = new FlutterSecureStorage();
   final List<String> _currencies = [
     'USD',
@@ -135,35 +143,54 @@ class _PaymentPageState extends State<PaymentPage> {
     'TWD'
   ];
 
-  String _selectedCategory = "Currency";
-  final List<String> _categories = [
-    'Currency',
-    'Amount',
-    'Recipient Account',
-    'Transaction Details'
-  ];
+  String _selectedCategory = "Pay";
+  final List<String> _categories = ['Pay', 'Gift', 'Bill', 'Transfer'];
+
+  /*
+  void getAllAccounts() async {
+    final url = Uri.parse(
+        'http://siprojekat.duckdns.org:5051/api/Exchange/GetAllAccounts');
+    final response = await http.get(url);
+    final jsonResponse = json.decode(response.body);
+    if (response.statusCode == 200) {
+      print(jsonResponse);
+    } else {
+      print('Ne radi');
+    }
+  }
+
+   */
 
   Future<transactionValidation> validateTransaction(
       double? amount,
       String currency,
-      String paymentType,
-      String description,
-      String recipientAccountNumber,
-      String firstName,
-      String lastName) async {
+      String transactionType,
+      String transactionPurpose,
+      String category,
+      String senderAccountNumber,
+      String recipientName,
+      String recipientAccountNumber) async {
     String? token = await storage.read(key: 'token');
 
     final uri = Uri.parse(
-        "https://processingserver.herokuapp.com/Transaction/CreateTransaction?token=$token");
+        "https://processingserver.herokuapp.com/api/Transaction/CreateTransaction?token=$token");
 
     final body = {
       "amount": amount,
       "currency": currency,
-      "paymentType": paymentType,
-      "description": description,
-      "recipientAccountNumber": recipientAccountNumber,
-      "recipientFirstName": firstName,
-      "recipientLastName": lastName
+      "transactionType": transactionType,
+      "transactionPurpose": transactionPurpose,
+      "category": category,
+      "sender": {
+        "accountNumber": senderAccountNumber,
+      },
+      "recipient": {
+        "name": recipientName,
+        "accountNumber": recipientAccountNumber
+      }
+      // "sender": senderAccountNumber,
+      // "recipientName": recipientName,
+      // "recipientAccountNumber": recipientAccountNumber
     };
 
     final headers = {
@@ -184,13 +211,15 @@ class _PaymentPageState extends State<PaymentPage> {
   void _submitPaymentForm() async {
     if (_formKey.currentState!.validate()) {
       var isValidRecipient = await validateTransaction(
-          double.tryParse(_amountController.text),
-          _selectedCurrency,
-          "type",
-          _recipientDescriptionController.text,
-          _recipientAccountController.text,
-          _recipientFirstNameController.text,
-          _recipientLastNameController.text);
+        double.tryParse(_amountController.text),
+        _selectedCurrency,
+        "type",
+        _recipientDescriptionController.text,
+        _selectedCurrency,
+        "",
+        _recipientAccountController.text,
+        _recipientNameController.text,
+      );
       if (!isValidRecipient.success) {
         showDialog(
             context: context,
@@ -231,7 +260,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     child: ListBody(
                       children: <Widget>[
                         Text(
-                            "Recipient Name: ${_recipientFirstNameController.text}"),
+                            "Recipient Name: ${_recipientNameController.text}"),
                         SizedBox(
                           height: 10,
                         ),
@@ -260,9 +289,66 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   void initState() {
+    _selectedCurrency = widget.currency;
     _amountController.text = widget.templateData[1];
-    _recipientFirstNameController.text = widget.templateData[2];
+    _recipientNameController.text = widget.templateData[2];
     _recipientAccountController.text = widget.templateData[3];
+  }
+
+  Future getUserId(String userName) async {
+    String? token = await storage.read(key: 'token');
+
+    final headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'authorization': 'Bearer $token'
+    };
+
+    final getUserId = await http.get(
+        Uri.parse("http://siprojekat.duckdns.org:5051/api/User/$userName"),
+        headers: headers);
+
+    if (getUserId.statusCode != 200) {
+      return false;
+    }
+
+    return json.decode(getUserId.body)['id'];
+  }
+
+  Future sendTemplate(
+      String? currency, String? amount, String? name, String? account) async {
+    String? token = await storage.read(key: 'token');
+
+    final headers = {
+      'Content-Type': 'application/json',
+      'authorization': 'Bearer $token'
+    };
+
+    var userId = await getUserId(name!);
+
+    if (!userId) {
+      return null;
+    }
+
+    var body = {
+      "userId": userId,
+      "title": "string",
+      "amount": amount,
+      "paymentType": "string",
+      "description": "string",
+      "currency": currency,
+      "recipientName": name,
+      "recipientAccountNumber": account,
+      "phoneNumber": "string",
+      "category": "string",
+      "received": "true"
+    };
+
+    final sendUserTemplate = await http.post(
+        Uri.parse('http://siprojekat.duckdns.org:5051/api/Template'),
+        headers: headers,
+        body: json.encode(body));
+
+    return json.decode(sendUserTemplate.body);
   }
 
   @override
@@ -321,43 +407,21 @@ class _PaymentPageState extends State<PaymentPage> {
                     }
                     return null;
                   },
-                  decoration: InputDecoration(
-                    suffixText: _selectedCurrency,
-                    suffixStyle:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    hintText: '0.00',
-                  ),
                 ),
                 SizedBox(height: 16),
-                Text('Recipient First Name'),
+                Text('Recipient Name'),
                 TextFormField(
-                  controller: _recipientFirstNameController,
+                  controller: _recipientNameController,
                   validator: (value) {
                     if (value!.isEmpty) {
                       return 'Recipient first name is required';
                     } else if (RegExp(r'[^a-zA-Z\s]').hasMatch(value)) {
-                      return 'Recipient first name can only contain letters and spaces';
+                      return 'Recipient name can only contain letters and spaces';
                     }
                     return null;
                   },
                   decoration: InputDecoration(
                     hintText: 'Enter recipient first name',
-                  ),
-                ),
-                SizedBox(height: 16),
-                Text('Recipient Last Name'),
-                TextFormField(
-                  controller: _recipientLastNameController,
-                  validator: (value) {
-                    if (value!.isEmpty) {
-                      return 'Recipient last name is required';
-                    } else if (RegExp(r'[^a-zA-Z\s]').hasMatch(value)) {
-                      return 'Recipient last name can only contain letters and spaces';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Enter recipient last name',
                   ),
                 ),
                 SizedBox(height: 16),
@@ -408,15 +472,22 @@ class _PaymentPageState extends State<PaymentPage> {
                 ),
                 SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     ElevatedButton(
                       onPressed: _submitPaymentForm,
                       child: Text('Submit'),
                     ),
-                    SizedBox(
-                      width: 50,
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => VoucherScreenQRScan()),
+                        );
+                      },
+                      child: Text('Voucher'),
                     ),
                     ElevatedButton(
                       onPressed: () {
@@ -428,35 +499,60 @@ class _PaymentPageState extends State<PaymentPage> {
                       },
                       child: Text("Templates"),
                     ),
-                    SizedBox(
-                      width: 50,
-                    ),
                     ElevatedButton(
                       onPressed: () async {
                         if (_formKey.currentState!.validate()) {
-                          Transaction newTransaction = Transaction(
-                            amount: double.tryParse(_amountController.text),
-                            currency: _selectedCurrency,
-                            paymentType: "type",
-                            description: _recipientDescriptionController.text,
-                            recipientAccountNumber:
-                                _recipientAccountController.text,
-                            recipientFirstName:
-                                _recipientFirstNameController.text,
-                            recipientLastName:
-                                _recipientLastNameController.text,
-                          );
-
-                          String transactionJson = newTransaction.toJson();
-
-                          Share.share(transactionJson,
-                              subject: 'New transaction for execution');
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Transaction sent for execution')),
-                          );
+                          var sent = await sendTemplate(
+                              _selectedCurrency,
+                              _amountController.text,
+                              _recipientNameController.text,
+                              _recipientAccountController.text);
+                          if (sent != null) {
+                            showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                        content: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text('Template sent succesfully !'),
+                                            Icon(
+                                              Icons.check_box,
+                                              color: Colors.green,
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                            child: Text('OK'),
+                                          )
+                                        ]));
+                          } else {
+                            showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                        content: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                                'No user with that username !'),
+                                            Icon(
+                                              Icons.clear,
+                                              color: Colors.red,
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                            },
+                                            child: Text('OK'),
+                                          )
+                                        ]));
+                          }
                         }
                       },
                       child: Text('Send'),
