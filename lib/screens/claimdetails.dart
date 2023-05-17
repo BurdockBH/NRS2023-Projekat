@@ -62,7 +62,8 @@ class InitalState extends State<ClaimDetailsScreen> {
     final responseData = json.decode(response.body);
     Claim claim = Claim.fromJson(responseData);
     for (int i = 0; i < claim.messages.length; i++) {
-      if (claim.messages[i]['userName'] != 'ADMINUSR') {
+      if (claim.messages[i]['userName'] != 'ABRULIC1') {
+        // TREBALO BI BITI ADMIN USER ALI OVAJ ADMIN TOKEN STO IMAM JE OD ARBULIC1
         var newmessage = Message(claim.messages[i]['message'], 'sender');
         Messages.add(newmessage);
       } else {
@@ -152,8 +153,12 @@ class InitalState extends State<ClaimDetailsScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Text("Status: " + widget.status.toUpperCase(),
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      if (widget.status == "Under_Investigation")
+                        Text("Status: " + "Open".toUpperCase(),
+                            style: TextStyle(fontWeight: FontWeight.bold))
+                      else
+                        Text("Status: " + widget.status.toUpperCase(),
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       SizedBox(height: 16.0),
                       Text("Subject: " + widget.subject),
                       SizedBox(height: 16.0),
